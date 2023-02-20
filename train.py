@@ -581,6 +581,8 @@ def main():
         batch_size=args.batch_size,
     )
 
+    print('dataset_train: ', dataset_train.__len__())
+    print('dataset_eval: ', dataset_eval.__len__())
     # setup mixup / cutmix
     collate_fn = None
     mixup_fn = None

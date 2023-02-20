@@ -87,27 +87,17 @@ class ConvNeXtBlock(nn.Module):
             act_layer='gelu',
             norm_layer=None,
             drop_path=0.,
-            remove_deepwise=False,
-            remove_shocut=False,
-            remove_layernorm=False
     ):
         super().__init__()
-        self.remove_shocut = remove_shocut
         out_chs = out_chs or in_chs
         act_layer = get_act_layer(act_layer)
         if not norm_layer:
             norm_layer = LayerNorm2d if conv_mlp else LayerNorm
         mlp_layer = partial(GlobalResponseNormMlp if use_grn else Mlp, use_conv=conv_mlp)
         self.use_conv_mlp = conv_mlp
-        if remove_deepwise:
-            self.conv_dw = nn.Identity()
-        else:
-            self.conv_dw = create_conv2d(
-                in_chs, out_chs, kernel_size=kernel_size, stride=stride, dilation=dilation, depthwise=True, bias=conv_bias)
-        if remove_layernorm:
-            self.norm = nn.Identity()
-        else:
-            self.norm = norm_layer(out_chs)
+        self.conv_dw = create_conv2d(
+            in_chs, out_chs, kernel_size=kernel_size, stride=stride, dilation=dilation, depthwise=True, bias=conv_bias)
+        self.norm = norm_layer(out_chs)
         self.mlp = mlp_layer(out_chs, int(mlp_ratio * out_chs), act_layer=act_layer)
         self.gamma = nn.Parameter(ls_init_value * torch.ones(out_chs)) if ls_init_value is not None else None
         self.drop_path = DropPath(drop_path) if drop_path > 0. else nn.Identity()
@@ -125,9 +115,8 @@ class ConvNeXtBlock(nn.Module):
             x = x.permute(0, 3, 1, 2)
         if self.gamma is not None:
             x = x.mul(self.gamma.reshape(1, -1, 1, 1))
-        # print('in: ',x.shape)
-        x = self.drop_path(x) + shortcut if not self.remove_shocut else self.drop_path(x)
-        # print(x.shape)
+
+        x = self.drop_path(x) + shortcut
         return x
 
 
@@ -148,10 +137,7 @@ class ConvNeXtStage(nn.Module):
             use_grn=False,
             act_layer='gelu',
             norm_layer=None,
-            norm_layer_cl=None,
-            remove_deepwise=False,
-            remove_shocut=False,
-            remove_layernorm=False
+            norm_layer_cl=None
     ):
         super().__init__()
         self.grad_checkpointing = False
@@ -184,9 +170,6 @@ class ConvNeXtStage(nn.Module):
                 use_grn=use_grn,
                 act_layer=act_layer,
                 norm_layer=norm_layer if conv_mlp else norm_layer_cl,
-                remove_deepwise=remove_deepwise,
-                remove_shocut=remove_shocut,
-                remove_layernorm=remove_layernorm
             ))
             in_chs = out_chs
         self.blocks = nn.Sequential(*stage_blocks)
@@ -228,9 +211,6 @@ class ConvNeXt(nn.Module):
             norm_eps: Optional[float] = None,
             drop_rate: float = 0.,
             drop_path_rate: float = 0.,
-            remove_deepwise: bool = False,
-            remove_shocut: bool = False,
-            remove_layernorm: bool = False,
     ):
         """
         Args:
@@ -322,9 +302,6 @@ class ConvNeXt(nn.Module):
                 act_layer=act_layer,
                 norm_layer=norm_layer,
                 norm_layer_cl=norm_layer_cl,
-                remove_deepwise=remove_deepwise,
-                remove_shocut=remove_shocut,
-                remove_layernorm=remove_layernorm
             ))
             prev_chs = out_chs
             # NOTE feature_info use currently assumes stage 0 == stride 1, rest are stride 2
@@ -450,19 +427,6 @@ def checkpoint_filter_fn(state_dict, model):
 
 
 def _create_convnext(variant, pretrained=False, **kwargs):
-    if kwargs.get('pretrained_cfg', '') == 'fcmae':
-        # NOTE fcmae pretrained weights have no classifier or final norm-layer (`head.norm`)
-        # This is workaround loading with num_classes=0 w/o removing norm-layer.
-        kwargs.setdefault('pretrained_strict', False)
-
-    model = build_model_with_cfg(
-        ConvNeXt, variant, pretrained,
-        pretrained_filter_fn=checkpoint_filter_fn,
-        feature_cfg=dict(out_indices=(0, 1, 2, 3), flatten_sequential=True),
-        **kwargs)
-    return model
-
-def _create_convnext_ablation_study(variant, pretrained=False, **kwargs):
     if kwargs.get('pretrained_cfg', '') == 'fcmae':
         # NOTE fcmae pretrained weights have no classifier or final norm-layer (`head.norm`)
         # This is workaround loading with num_classes=0 w/o removing norm-layer.
@@ -907,13 +871,6 @@ def convnext_tiny_hnf(pretrained=False, **kwargs):
 def convnext_tiny(pretrained=False, **kwargs):
     model_args = dict(depths=(3, 3, 9, 3), dims=(96, 192, 384, 768), **kwargs)
     model = _create_convnext('convnext_tiny', pretrained=pretrained, **model_args)
-    return model
-
-
-@register_model
-def convnext_tiny_ablation_study(pretrained=False, **kwargs):
-    model_args = dict(depths=(3, 3, 9, 3), dims=(96, 192, 384, 768), **kwargs)
-    model = _create_convnext('convnext_tiny_ablation_study', pretrained=pretrained, **model_args)
     return model
 
 
