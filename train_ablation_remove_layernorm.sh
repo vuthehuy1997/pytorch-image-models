@@ -1,1 +1,1 @@
-CUDA_VISIBLE_DEVICES=0 python train.py datasets/food-101 --model convnext_tiny_ablation_study -b 32 --model-kwargs remove_deepwise=False remove_shocut=False remove_layernorm=True
+CUDA_VISIBLE_DEVICES=0 python train.py datasets/food-101 --model convnext_tiny_ablation_study -b 32 --model-kwargs remove_deepwise=False remove_shortcut=False remove_layernorm=True

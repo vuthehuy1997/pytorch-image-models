@@ -88,11 +88,11 @@ class ConvNeXtBlock(nn.Module):
             norm_layer=None,
             drop_path=0.,
             remove_deepwise=False,
-            remove_shocut=False,
+            remove_shortcut=False,
             remove_layernorm=False
     ):
         super().__init__()
-        self.remove_shocut = remove_shocut
+        self.remove_shortcut = remove_shortcut
         out_chs = out_chs or in_chs
         act_layer = get_act_layer(act_layer)
         if not norm_layer:
@@ -126,7 +126,7 @@ class ConvNeXtBlock(nn.Module):
         if self.gamma is not None:
             x = x.mul(self.gamma.reshape(1, -1, 1, 1))
         # print('in: ',x.shape)
-        x = self.drop_path(x) + shortcut if not self.remove_shocut else self.drop_path(x)
+        x = self.drop_path(x) + shortcut if not self.remove_shortcut else self.drop_path(x)
         # print(x.shape)
         return x
 
@@ -150,7 +150,7 @@ class ConvNeXtStage(nn.Module):
             norm_layer=None,
             norm_layer_cl=None,
             remove_deepwise=False,
-            remove_shocut=False,
+            remove_shortcut=False,
             remove_layernorm=False
     ):
         super().__init__()
@@ -185,7 +185,7 @@ class ConvNeXtStage(nn.Module):
                 act_layer=act_layer,
                 norm_layer=norm_layer if conv_mlp else norm_layer_cl,
                 remove_deepwise=remove_deepwise,
-                remove_shocut=remove_shocut,
+                remove_shortcut=remove_shortcut,
                 remove_layernorm=remove_layernorm
             ))
             in_chs = out_chs
@@ -229,7 +229,7 @@ class ConvNeXt(nn.Module):
             drop_rate: float = 0.,
             drop_path_rate: float = 0.,
             remove_deepwise: bool = False,
-            remove_shocut: bool = False,
+            remove_shortcut: bool = False,
             remove_layernorm: bool = False,
     ):
         """
@@ -323,7 +323,7 @@ class ConvNeXt(nn.Module):
                 norm_layer=norm_layer,
                 norm_layer_cl=norm_layer_cl,
                 remove_deepwise=remove_deepwise,
-                remove_shocut=remove_shocut,
+                remove_shortcut=remove_shortcut,
                 remove_layernorm=remove_layernorm
             ))
             prev_chs = out_chs
@@ -450,19 +450,6 @@ def checkpoint_filter_fn(state_dict, model):
 
 
 def _create_convnext(variant, pretrained=False, **kwargs):
-    if kwargs.get('pretrained_cfg', '') == 'fcmae':
-        # NOTE fcmae pretrained weights have no classifier or final norm-layer (`head.norm`)
-        # This is workaround loading with num_classes=0 w/o removing norm-layer.
-        kwargs.setdefault('pretrained_strict', False)
-
-    model = build_model_with_cfg(
-        ConvNeXt, variant, pretrained,
-        pretrained_filter_fn=checkpoint_filter_fn,
-        feature_cfg=dict(out_indices=(0, 1, 2, 3), flatten_sequential=True),
-        **kwargs)
-    return model
-
-def _create_convnext_ablation_study(variant, pretrained=False, **kwargs):
     if kwargs.get('pretrained_cfg', '') == 'fcmae':
         # NOTE fcmae pretrained weights have no classifier or final norm-layer (`head.norm`)
         # This is workaround loading with num_classes=0 w/o removing norm-layer.
