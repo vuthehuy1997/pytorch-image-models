@@ -312,11 +312,11 @@ group.add_argument('--seed', type=int, default=42, metavar='S',
                    help='random seed (default: 42)')
 group.add_argument('--worker-seeding', type=str, default='all',
                    help='worker seed mode (default: all)')
-group.add_argument('--log-interval', type=int, default=50, metavar='N',
+group.add_argument('--log-interval', type=int, default=300, metavar='N',
                    help='how many batches to wait before logging training status')
 group.add_argument('--recovery-interval', type=int, default=0, metavar='N',
                    help='how many batches to wait before writing recovery checkpoint')
-group.add_argument('--checkpoint-hist', type=int, default=10, metavar='N',
+group.add_argument('--checkpoint-hist', type=int, default=20, metavar='N',
                    help='number of checkpoints to keep (default: 10)')
 group.add_argument('-j', '--workers', type=int, default=4, metavar='N',
                    help='how many training processes to use (default: 4)')
@@ -691,12 +691,17 @@ def main():
     output_dir = None
     if utils.is_primary(args):
         if args.experiment:
-            exp_name = args.experiment
+            exp_name = '-'.join([
+                # datetime.now().strftime("%Y%m%d-%H%M%S"),
+                safe_model_name(args.model),
+                args.experiment,
+                f"{str(data_config['input_size'][-1])}_{args.epochs}ep"
+            ])
         else:
             exp_name = '-'.join([
                 datetime.now().strftime("%Y%m%d-%H%M%S"),
                 safe_model_name(args.model),
-                str(data_config['input_size'][-1])
+                f"str(data_config['input_size'][-1])_{args.epochs}ep"
             ])
         output_dir = utils.get_outdir(args.output if args.output else './output/train', exp_name)
         decreasing = True if eval_metric == 'loss' else False

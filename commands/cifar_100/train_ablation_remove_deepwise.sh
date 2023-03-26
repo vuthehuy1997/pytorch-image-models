@@ -1,0 +1,1 @@
+CUDA_VISIBLE_DEVICES=2 python train_.py ../datasets --dataset torch/cifar100 --amp --model convnext_tiny_ablation_study -b 32 --experiment deepwise_cf100 --model-kwargs remove_deepwise=True remove_shortcut=False remove_layernorm=False
