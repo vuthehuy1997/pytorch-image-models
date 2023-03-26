@@ -89,7 +89,8 @@ class ConvNeXtBlock(nn.Module):
             drop_path=0.,
             remove_deepwise=False,
             remove_shortcut=False,
-            remove_layernorm=False
+            remove_layernorm=False,
+            change_deepwise=False
     ):
         super().__init__()
         self.remove_shortcut = remove_shortcut
@@ -101,6 +102,9 @@ class ConvNeXtBlock(nn.Module):
         self.use_conv_mlp = conv_mlp
         if remove_deepwise:
             self.conv_dw = nn.Identity()
+        elif change_deepwise:
+            self.conv_dw = create_conv2d(
+                in_chs, out_chs, kernel_size=kernel_size, stride=stride, dilation=dilation, depthwise=False, bias=conv_bias)
         else:
             self.conv_dw = create_conv2d(
                 in_chs, out_chs, kernel_size=kernel_size, stride=stride, dilation=dilation, depthwise=True, bias=conv_bias)
@@ -151,7 +155,8 @@ class ConvNeXtStage(nn.Module):
             norm_layer_cl=None,
             remove_deepwise=False,
             remove_shortcut=False,
-            remove_layernorm=False
+            remove_layernorm=False,
+            change_deepwise=False
     ):
         super().__init__()
         self.grad_checkpointing = False
@@ -186,7 +191,8 @@ class ConvNeXtStage(nn.Module):
                 norm_layer=norm_layer if conv_mlp else norm_layer_cl,
                 remove_deepwise=remove_deepwise,
                 remove_shortcut=remove_shortcut,
-                remove_layernorm=remove_layernorm
+                remove_layernorm=remove_layernorm,
+                change_deepwise=change_deepwise
             ))
             in_chs = out_chs
         self.blocks = nn.Sequential(*stage_blocks)
@@ -231,6 +237,8 @@ class ConvNeXt(nn.Module):
             remove_deepwise: bool = False,
             remove_shortcut: bool = False,
             remove_layernorm: bool = False,
+            remove_stem: bool = False,
+            change_deepwise: bool = False,
     ):
         """
         Args:
@@ -276,26 +284,32 @@ class ConvNeXt(nn.Module):
         self.feature_info = []
 
         assert stem_type in ('patch', 'overlap', 'overlap_tiered')
-        if stem_type == 'patch':
-            # NOTE: this stem is a minimal form of ViT PatchEmbed, as used in SwinTransformer w/ patch_size = 4
-            self.stem = nn.Sequential(
-                nn.Conv2d(in_chans, dims[0], kernel_size=patch_size, stride=patch_size, bias=conv_bias),
-                norm_layer(dims[0]),
-            )
-            stem_stride = patch_size
+        if not remove_stem:
+            if stem_type == 'patch':
+                # NOTE: this stem is a minimal form of ViT PatchEmbed, as used in SwinTransformer w/ patch_size = 4
+                self.stem = nn.Sequential(
+                    nn.Conv2d(in_chans, dims[0], kernel_size=patch_size, stride=patch_size, bias=conv_bias),
+                    norm_layer(dims[0]),
+                )
+                stem_stride = patch_size
+            else:
+                mid_chs = make_divisible(dims[0] // 2) if 'tiered' in stem_type else dims[0]
+                self.stem = nn.Sequential(
+                    nn.Conv2d(in_chans, mid_chs, kernel_size=3, stride=2, padding=1, bias=conv_bias),
+                    nn.Conv2d(mid_chs, dims[0], kernel_size=3, stride=2, padding=1, bias=conv_bias),
+                    norm_layer(dims[0]),
+                )
+                stem_stride = 4
+            prev_chs = dims[0]
         else:
-            mid_chs = make_divisible(dims[0] // 2) if 'tiered' in stem_type else dims[0]
-            self.stem = nn.Sequential(
-                nn.Conv2d(in_chans, mid_chs, kernel_size=3, stride=2, padding=1, bias=conv_bias),
-                nn.Conv2d(mid_chs, dims[0], kernel_size=3, stride=2, padding=1, bias=conv_bias),
-                norm_layer(dims[0]),
-            )
-            stem_stride = 4
+            self.stem = nn.Identity()
+            stem_stride = 1
+            prev_chs = in_chans
 
         self.stages = nn.Sequential()
         dp_rates = [x.tolist() for x in torch.linspace(0, drop_path_rate, sum(depths)).split(depths)]
         stages = []
-        prev_chs = dims[0]
+        
         curr_stride = stem_stride
         dilation = 1
         # 4 feature resolution stages, each consisting of multiple residual blocks
@@ -324,7 +338,8 @@ class ConvNeXt(nn.Module):
                 norm_layer_cl=norm_layer_cl,
                 remove_deepwise=remove_deepwise,
                 remove_shortcut=remove_shortcut,
-                remove_layernorm=remove_layernorm
+                remove_layernorm=remove_layernorm,
+                change_deepwise=change_deepwise
             ))
             prev_chs = out_chs
             # NOTE feature_info use currently assumes stage 0 == stride 1, rest are stride 2
