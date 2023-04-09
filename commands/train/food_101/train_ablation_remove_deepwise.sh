@@ -1,0 +1,1 @@
+CUDA_VISIBLE_DEVICES=3 python train_.py --data-dir ../datasets/food-101 --amp --model convnext_tiny_ablation_study -b 16  --experiment stem_food --model-kwargs remove_deepwise=True remove_shortcut=False remove_layernorm=False remove_stem=False
