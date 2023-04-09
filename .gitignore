@@ -103,7 +103,6 @@ venv.bak/
 # PyCharm
 .idea
 
-output/
 
 # PyTorch weights
 *.tar
