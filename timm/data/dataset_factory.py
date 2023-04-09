@@ -4,12 +4,13 @@ Hacked together by / Copyright 2021, Ross Wightman
 """
 import os
 
-from torchvision.datasets import CIFAR100, CIFAR10, MNIST, KMNIST, FashionMNIST, Flowers102, ImageFolder
+from torchvision.datasets import CIFAR100, CIFAR10, MNIST, KMNIST, FashionMNIST, ImageFolder
 try:
     from torchvision.datasets import Places365
     has_places365 = True
 except ImportError:
     has_places365 = False
+
 try:
     from torchvision.datasets import INaturalist
     has_inaturalist = True
@@ -34,7 +35,6 @@ _TORCH_BASIC_DS = dict(
     mnist=MNIST,
     kmnist=KMNIST,
     fashion_mnist=FashionMNIST,
-    flowers102=Flowers102,
 )
 _TRAIN_SYNONYM = dict(train=None, training=None)
 _EVAL_SYNONYM = dict(val=None, valid=None, validation=None, eval=None, evaluation=None)

@@ -117,6 +117,9 @@ parser.add_argument('--model-kwargs', nargs='*', default={}, action=ParseKwargs)
 parser.add_argument('--results-dir', type=str, default=None,
                     help='folder for output results')
 
+parser.add_argument('--exp', type=str, default=None,
+                    help='folder for output results')
+
 def get_image_transforms(input_size):
     transforms = []
     transforms += [
@@ -195,14 +198,16 @@ def main():
     filenames = []
     for root, subdirs, files in os.walk(args.data_dir, topdown=False, followlinks=True):
         for f in files:
-            base, ext = os.path.splitext(f)
-            filenames.append(os.path.join(root, f).replace(args.data_dir, ''))
-    
+            # base, ext = os.path.splitext(f)
+            # filenames.append(os.path.join(root, f).replace(args.data_dir, ''))
+            filenames.append(f)
+    # print("filenames: ", filenames)
     transforms = get_image_transforms(224)
     for idx, filename in enumerate(filenames):
-        print(filename)
-        path = os.path.join(args.data_dir, filename)
-        pil_image = Image.open(path).convert('RGB')
+        img_path = os.path.join(args.data_dir, filename)
+        print("filename: ", filename)
+        print("path: ", img_path)
+        pil_image = Image.open(img_path).convert('RGB')
         image = transforms(pil_image)
         image.unsqueeze_(dim=0)
         image = image.to(device)
@@ -215,7 +220,8 @@ def main():
 
         pil_out = Image.fromarray(visualization)
 
-        filename = os.path.join(args.results_dir, filename)
+        save_dir = f"{args.results_dir}_{args.exp}"
+        filename = os.path.join(save_dir, filename)
         os.makedirs(os.path.dirname(filename), exist_ok = True)
         pil_out.save(filename)
 
